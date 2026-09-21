@@ -68,3 +68,10 @@ ExpressionConfiguration configuration = ExpressionConfiguration.builder()
 
 Expression expression = new Expression("2.128 + a", configuration);
 ```
+
+### Resource Budgets
+
+Every read of a variable through `getData(String variable)` during evaluation counts as one
+`DATA_ACCESS` unit of the active resource budget. A custom accessor that performs additional reads
+from inside a function can record them with `EvaluationContext.recordDataAccess()`. See
+[Resource Budgets and Cancellation](../concepts/resource_budgets.html) for details.

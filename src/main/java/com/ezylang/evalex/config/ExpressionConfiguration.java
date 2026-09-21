@@ -15,6 +15,7 @@
 */
 package com.ezylang.evalex.config;
 
+import com.ezylang.evalex.budget.ResourceBudget;
 import com.ezylang.evalex.data.DataAccessorIfc;
 import com.ezylang.evalex.data.EvaluationValue;
 import com.ezylang.evalex.data.MapBasedDataAccessor;
@@ -393,6 +394,15 @@ public class ExpressionConfiguration {
 
   /** The maximum recursion depth allowed for nested expressions. */
   @Builder.Default private final int maxRecursionDepth = DEFAULT_MAX_RECURSION_DEPTH;
+
+  /**
+   * Optional resource budget enforced for a single evaluation. When unset, no work is counted and
+   * evaluation behaves as without a budget. A budget can also be passed directly to {@code
+   * Expression.evaluate(ResourceBudget)}.
+   *
+   * @since 3.8.0
+   */
+  @Builder.Default private final ResourceBudget resourceBudget = ResourceBudget.UNBOUNDED;
 
   /**
    * This parameter limits the maximum runtime of a single regular expression matching operation,

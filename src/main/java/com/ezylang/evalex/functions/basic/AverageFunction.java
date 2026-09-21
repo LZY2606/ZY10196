@@ -16,6 +16,7 @@
 package com.ezylang.evalex.functions.basic;
 
 import com.ezylang.evalex.Expression;
+import com.ezylang.evalex.budget.EvaluationContext;
 import com.ezylang.evalex.data.EvaluationValue;
 import com.ezylang.evalex.functions.FunctionParameter;
 import com.ezylang.evalex.parser.Token;
@@ -52,6 +53,7 @@ public class AverageFunction extends AbstractMinMaxFunction {
     SumAndCount aux = new SumAndCount();
     if (parameter.isArrayValue()) {
       for (EvaluationValue element : parameter.getArrayValue()) {
+        EvaluationContext.recordCollectionElement();
         aux = aux.plus(recursiveSumAndCount(element));
       }
       return aux;

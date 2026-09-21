@@ -15,6 +15,9 @@
 */
 package com.ezylang.evalex;
 
+import com.ezylang.evalex.budget.BudgetCategory;
+import com.ezylang.evalex.budget.EvaluationContext;
+import com.ezylang.evalex.budget.ResourceBudget;
 import com.ezylang.evalex.config.ExpressionConfiguration;
 import com.ezylang.evalex.data.DataAccessorIfc;
 import com.ezylang.evalex.data.EvaluationValue;
@@ -108,7 +111,69 @@ public class Expression {
    * @throws ParseException If there were problems while parsing the expression.
    */
   public EvaluationValue evaluate() throws EvaluationException, ParseException {
-    EvaluationValue result = evaluateSubtree(getAbstractSyntaxTree(), 0);
+    return evaluateWithRootContext(null);
+  }
+
+  /**
+   * Evaluates the expression with an explicit resource budget.
+   *
+   * <p>If the current thread already runs an evaluation, e.g. because this expression is evaluated
+   * from within a custom function, the active {@link EvaluationContext} is joined and the given
+   * budget is ignored. Nested evaluations can therefore not bypass the parent budget by starting a
+   * fresh one.
+   *
+   * @param budget The resource budget to enforce.
+   * @return The evaluation result value.
+   * @throws EvaluationException If there were problems while evaluating the expression.
+   * @throws ParseException If there were problems while parsing the expression.
+   * @since 3.8.0
+   */
+  public EvaluationValue evaluate(ResourceBudget budget)
+      throws EvaluationException, ParseException {
+    return evaluateWithRootContext(budget);
+  }
+
+  /**
+   * Evaluates the expression with an explicit per-evaluation context.
+   *
+   * <p>The caller controls cancellation through the supplied context. If the current thread already
+   * runs an evaluation, that active context is joined instead and the supplied one is ignored.
+   *
+   * @param context The context carrying the budget and cancellation state.
+   * @return The evaluation result value.
+   * @throws EvaluationException If there were problems while evaluating the expression.
+   * @throws ParseException If there were problems while parsing the expression.
+   * @since 3.8.0
+   */
+  public EvaluationValue evaluate(EvaluationContext context)
+      throws EvaluationException, ParseException {
+    if (EvaluationContext.getCurrent() != null) {
+      return finishResult(evaluateNode(getAbstractSyntaxTree(), 0));
+    }
+    context.activate();
+    try {
+      return finishResult(evaluateNode(getAbstractSyntaxTree(), 0));
+    } finally {
+      context.close();
+    }
+  }
+
+  private EvaluationValue evaluateWithRootContext(ResourceBudget budget)
+      throws EvaluationException, ParseException {
+    if (EvaluationContext.getCurrent() != null) {
+      return finishResult(evaluateNode(getAbstractSyntaxTree(), 0));
+    }
+    ResourceBudget effectiveBudget = budget != null ? budget : configuration.getResourceBudget();
+    EvaluationContext context = new EvaluationContext(effectiveBudget);
+    context.activate();
+    try {
+      return finishResult(evaluateNode(getAbstractSyntaxTree(), 0));
+    } finally {
+      context.close();
+    }
+  }
+
+  private EvaluationValue finishResult(EvaluationValue result) {
     if (result.isNumberValue()) {
       BigDecimal bigDecimal = result.getNumberValue();
       if (configuration.getDecimalPlacesResult()
@@ -134,7 +199,39 @@ public class Expression {
    * @throws EvaluationException If there were problems while evaluating the expression.
    */
   public EvaluationValue evaluateSubtree(ASTNode startNode) throws EvaluationException {
-    return evaluateSubtree(startNode, 0);
+    EvaluationContext existing = EvaluationContext.getCurrent();
+    if (existing != null) {
+      return evaluateNode(startNode, 0);
+    }
+    EvaluationContext context = new EvaluationContext(configuration.getResourceBudget());
+    context.activate();
+    try {
+      return evaluateNode(startNode, 0);
+    } finally {
+      context.close();
+    }
+  }
+
+  /**
+   * Evaluates a lazy function parameter or lazy operator operand, caching the result within the
+   * current evaluation.
+   *
+   * <p>The first evaluation of a node counts as {@link BudgetCategory#LAZY_EVALUATION} and visits
+   * the subtree normally. Repeated reads of the same node return the cached result and count as
+   * {@link BudgetCategory#LAZY_CACHE_HIT} without visiting the node again. This is the public entry
+   * point intended for custom functions and operators that receive lazy parameters.
+   *
+   * @param node The expression node wrapped in the lazy parameter value.
+   * @return The evaluated or cached value.
+   * @throws EvaluationException If evaluation of the node fails.
+   * @since 3.8.0
+   */
+  public EvaluationValue evaluateLazyParameter(ASTNode node) throws EvaluationException {
+    EvaluationContext context = EvaluationContext.getCurrent();
+    if (context == null) {
+      return evaluateSubtree(node);
+    }
+    return context.evaluateLazy(this, node);
   }
 
   /**
@@ -146,12 +243,17 @@ public class Expression {
    * @return The evaluation result value.
    * @throws EvaluationException If there were problems while evaluating the expression.
    */
-  private EvaluationValue evaluateSubtree(ASTNode startNode, int depth) throws EvaluationException {
+  private EvaluationValue evaluateNode(ASTNode startNode, int depth) throws EvaluationException {
+    EvaluationContext context = EvaluationContext.getCurrent();
+    Token token = startNode.getToken();
+    if (context != null) {
+      context.setCurrentToken(token);
+      context.record(BudgetCategory.NODE_VISIT);
+    }
     if (depth > configuration.getMaxRecursionDepth()) {
       throw new EvaluationException(startNode.getToken(), "Max recursion depth exceeded");
     }
 
-    Token token = startNode.getToken();
     EvaluationValue result;
     switch (token.getType()) {
       case NUMBER_LITERAL:
@@ -161,30 +263,26 @@ public class Expression {
         result = EvaluationValue.stringValue(token.getValue());
         break;
       case VARIABLE_OR_CONSTANT:
-        result = getVariableOrConstant(token);
+        result = getVariableOrConstant(token, context);
         if (result.isExpressionNode()) {
-          result = evaluateSubtree(result.getExpressionNode(), depth + 1);
+          result = evaluateNode(result.getExpressionNode(), depth + 1);
         }
         break;
       case PREFIX_OPERATOR:
       case POSTFIX_OPERATOR:
-        result =
-            token
-                .getOperatorDefinition()
-                .evaluate(
-                    this, token, evaluateSubtree(startNode.getParameters().get(0), depth + 1));
+        result = evaluateUnaryOperator(startNode, token, depth + 1, context);
         break;
       case INFIX_OPERATOR:
-        result = evaluateInfixOperator(startNode, token, depth + 1);
+        result = evaluateInfixOperator(startNode, token, depth + 1, context);
         break;
       case ARRAY_INDEX:
-        result = evaluateArrayIndex(startNode, depth + 1);
+        result = evaluateArrayIndex(startNode, depth + 1, context);
         break;
       case STRUCTURE_SEPARATOR:
         result = evaluateStructureSeparator(startNode, depth + 1);
         break;
       case FUNCTION:
-        result = evaluateFunction(startNode, token, depth + 1);
+        result = evaluateFunction(startNode, token, depth + 1, context);
         break;
       default:
         throw new EvaluationException(token, "Unexpected evaluation token: " + token);
@@ -199,9 +297,30 @@ public class Expression {
     return result;
   }
 
-  private EvaluationValue getVariableOrConstant(Token token) throws EvaluationException {
+  private EvaluationValue evaluateUnaryOperator(
+      ASTNode startNode, Token token, int depth, EvaluationContext context)
+      throws EvaluationException {
+    if (context != null) {
+      context.enterOperator(token);
+    }
+    try {
+      return token
+          .getOperatorDefinition()
+          .evaluate(this, token, evaluateNode(startNode.getParameters().get(0), depth + 1));
+    } finally {
+      if (context != null) {
+        context.leaveCall();
+      }
+    }
+  }
+
+  private EvaluationValue getVariableOrConstant(Token token, EvaluationContext context)
+      throws EvaluationException {
     EvaluationValue result = constants.get(token.getValue());
     if (result == null) {
+      if (context != null) {
+        context.record(BudgetCategory.DATA_ACCESS);
+      }
       result = getDataAccessor().getData(token.getValue());
     }
     if (result == null) {
@@ -214,30 +333,40 @@ public class Expression {
     return result;
   }
 
-  private EvaluationValue evaluateFunction(ASTNode startNode, Token token, int depth)
+  private EvaluationValue evaluateFunction(
+      ASTNode startNode, Token token, int depth, EvaluationContext context)
       throws EvaluationException {
+    if (context != null) {
+      context.enterFunction(token);
+    }
     List<EvaluationValue> parameterResults = new ArrayList<>();
-    for (int i = 0; i < startNode.getParameters().size(); i++) {
-      if (token.getFunctionDefinition().isParameterLazy(i)) {
-        parameterResults.add(convertValue(startNode.getParameters().get(i)));
-      } else {
-        parameterResults.add(evaluateSubtree(startNode.getParameters().get(i), depth + 1));
+    try {
+      for (int i = 0; i < startNode.getParameters().size(); i++) {
+        if (token.getFunctionDefinition().isParameterLazy(i)) {
+          parameterResults.add(convertValue(startNode.getParameters().get(i)));
+        } else {
+          parameterResults.add(evaluateNode(startNode.getParameters().get(i), depth + 1));
+        }
+      }
+
+      EvaluationValue[] parameters = parameterResults.toArray(new EvaluationValue[0]);
+
+      FunctionIfc function = token.getFunctionDefinition();
+
+      function.validatePreEvaluation(token, parameters);
+
+      return function.evaluate(this, token, parameters);
+    } finally {
+      if (context != null) {
+        context.leaveCall();
       }
     }
-
-    EvaluationValue[] parameters = parameterResults.toArray(new EvaluationValue[0]);
-
-    FunctionIfc function = token.getFunctionDefinition();
-
-    function.validatePreEvaluation(token, parameters);
-
-    return function.evaluate(this, token, parameters);
   }
 
-  private EvaluationValue evaluateArrayIndex(ASTNode startNode, int depth)
-      throws EvaluationException {
-    EvaluationValue array = evaluateSubtree(startNode.getParameters().get(0), depth + 1);
-    EvaluationValue index = evaluateSubtree(startNode.getParameters().get(1), depth + 1);
+  private EvaluationValue evaluateArrayIndex(
+      ASTNode startNode, int depth, EvaluationContext context) throws EvaluationException {
+    EvaluationValue array = evaluateNode(startNode.getParameters().get(0), depth + 1);
+    EvaluationValue index = evaluateNode(startNode.getParameters().get(1), depth + 1);
 
     if (array.isArrayValue() && index.isNumberValue()) {
       if (index.getNumberValue().intValue() < 0
@@ -248,6 +377,9 @@ public class Expression {
                 "Index %d out of bounds for array of length %d",
                 index.getNumberValue().intValue(), array.getArrayValue().size()));
       }
+      if (context != null) {
+        context.record(BudgetCategory.COLLECTION_ELEMENT);
+      }
       return array.getArrayValue().get(index.getNumberValue().intValue());
     } else {
       throw EvaluationException.ofUnsupportedDataTypeInOperation(startNode.getToken());
@@ -256,7 +388,7 @@ public class Expression {
 
   private EvaluationValue evaluateStructureSeparator(ASTNode startNode, int depth)
       throws EvaluationException {
-    EvaluationValue structure = evaluateSubtree(startNode.getParameters().get(0), depth + 1);
+    EvaluationValue structure = evaluateNode(startNode.getParameters().get(0), depth + 1);
     Token nameToken = startNode.getParameters().get(1).getToken();
     String name = nameToken.getValue();
 
@@ -278,20 +410,30 @@ public class Expression {
     }
   }
 
-  private EvaluationValue evaluateInfixOperator(ASTNode startNode, Token token, int depth)
+  private EvaluationValue evaluateInfixOperator(
+      ASTNode startNode, Token token, int depth, EvaluationContext context)
       throws EvaluationException {
     EvaluationValue left;
     EvaluationValue right;
 
     OperatorIfc op = token.getOperatorDefinition();
-    if (op.isOperandLazy()) {
-      left = convertValue(startNode.getParameters().get(0));
-      right = convertValue(startNode.getParameters().get(1));
-    } else {
-      left = evaluateSubtree(startNode.getParameters().get(0), depth + 1);
-      right = evaluateSubtree(startNode.getParameters().get(1), depth + 1);
+    if (context != null) {
+      context.enterOperator(token);
     }
-    return op.evaluate(this, token, left, right);
+    try {
+      if (op.isOperandLazy()) {
+        left = convertValue(startNode.getParameters().get(0));
+        right = convertValue(startNode.getParameters().get(1));
+      } else {
+        left = evaluateNode(startNode.getParameters().get(0), depth + 1);
+        right = evaluateNode(startNode.getParameters().get(1), depth + 1);
+      }
+      return op.evaluate(this, token, left, right);
+    } finally {
+      if (context != null) {
+        context.leaveCall();
+      }
+    }
   }
 
   /**

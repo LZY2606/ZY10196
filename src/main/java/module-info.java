@@ -2,6 +2,7 @@ module com.ezylang.evalex {
   requires static lombok;
 
   exports com.ezylang.evalex;
+  exports com.ezylang.evalex.budget;
   exports com.ezylang.evalex.config;
   exports com.ezylang.evalex.data;
   exports com.ezylang.evalex.data.conversion;
@@ -20,6 +21,7 @@ module com.ezylang.evalex {
   // keep packages open for reflective frameworks and tests.
   // Can be restricted in a follow-up once reflective use is narrowed down.
   opens com.ezylang.evalex;
+  opens com.ezylang.evalex.budget;
   opens com.ezylang.evalex.config;
   opens com.ezylang.evalex.data;
   opens com.ezylang.evalex.data.conversion;

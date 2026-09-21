@@ -33,7 +33,7 @@ public class InfixOrOperator extends AbstractOperator {
       Expression expression, Token operatorToken, EvaluationValue... operands)
       throws EvaluationException {
     return expression.convertValue(
-        expression.evaluateSubtree(operands[0].getExpressionNode()).getBooleanValue()
-            || expression.evaluateSubtree(operands[1].getExpressionNode()).getBooleanValue());
+        expression.evaluateLazyParameter(operands[0].getExpressionNode()).getBooleanValue()
+            || expression.evaluateLazyParameter(operands[1].getExpressionNode()).getBooleanValue());
   }
 }

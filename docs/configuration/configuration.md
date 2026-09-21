@@ -184,6 +184,28 @@ ExpressionConfiguration configuration=ExpressionConfiguration.builder()
         Expression expression=new Expression("-2^2",configuration);
 ```
 
+### Resource Budget[^5]
+
+An optional _ResourceBudget_ limits the work performed by one evaluation. It can limit AST node
+visits, function and operator calls, lazy parameter evaluations and cache hits, collection element
+traversal and data accessor reads. Limits can be set per category or as a shared total weight.
+
+When no budget is set (the default), no work is counted and the behavior is unchanged. See
+[Resource Budgets and Cancellation](../concepts/resource_budgets.html) for the full semantics.
+
+```java
+ResourceBudget budget = ResourceBudget.builder()
+        .limit(BudgetCategory.FUNCTION_CALL, 1000)
+        .totalWeightLimit(1_000_000)
+        .build();
+
+ExpressionConfiguration configuration = ExpressionConfiguration.builder()
+        .resourceBudget(budget)
+        .build();
+```
+
+[^5]: Since 3.8.0
+
 ### RegEx Timeout in Milliseconds[^4]
 
 This parameter limits the maximum runtime of a single regular expression matching operation, helping to

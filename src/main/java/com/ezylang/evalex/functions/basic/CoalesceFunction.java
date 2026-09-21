@@ -19,6 +19,7 @@ import static java.util.Arrays.stream;
 import static java.util.stream.Stream.of;
 
 import com.ezylang.evalex.Expression;
+import com.ezylang.evalex.budget.EvaluationContext;
 import com.ezylang.evalex.data.EvaluationValue;
 import com.ezylang.evalex.functions.AbstractFunction;
 import com.ezylang.evalex.functions.FunctionParameter;
@@ -36,7 +37,14 @@ public class CoalesceFunction extends AbstractFunction {
       Expression expression, Token functionToken, EvaluationValue... parameterValues) {
 
     return stream(parameterValues)
-        .flatMap(v -> v.isArrayValue() ? v.getArrayValue().stream() : of(v))
+        .flatMap(
+            v -> {
+              if (v.isArrayValue()) {
+                return v.getArrayValue().stream()
+                    .peek(element -> EvaluationContext.recordCollectionElement());
+              }
+              return of(v);
+            })
         .filter(v -> !v.isNullValue())
         .findFirst()
         .orElse(EvaluationValue.NULL_VALUE);

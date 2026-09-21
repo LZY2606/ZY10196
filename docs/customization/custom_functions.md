@@ -140,3 +140,14 @@ ExpressionConfiguration configuration =
     
 Expression expression = new Expression("MAX_VALUE(1,2,3) + MIN_VALUE(7,8,9)", configuration);
 ```
+
+### Resource Budgets
+
+When a function evaluates lazy parameters, use
+`expression.evaluateLazyParameter(parameterValue.getExpressionNode())` instead of calling
+`evaluateSubtree` directly. The first evaluation is counted and performed normally, repeated reads
+of the same node return the cached result and are counted as cache hits.
+
+A function that iterates array or collection elements can record each traversed element with
+`EvaluationContext.recordCollectionElement()`. See
+[Resource Budgets and Cancellation](../concepts/resource_budgets.html) for details.

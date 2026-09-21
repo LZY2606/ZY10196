@@ -98,7 +98,7 @@ public class SwitchFunction extends AbstractFunction {
   private EvaluationValue evaluateParameter(Expression expression, EvaluationValue parameter)
       throws EvaluationException {
     return parameter.isExpressionNode()
-        ? expression.evaluateSubtree(parameter.getExpressionNode())
+        ? expression.evaluateLazyParameter(parameter.getExpressionNode())
         : parameter;
   }
 }

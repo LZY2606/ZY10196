@@ -16,6 +16,7 @@
 package com.ezylang.evalex.functions.basic;
 
 import com.ezylang.evalex.Expression;
+import com.ezylang.evalex.budget.EvaluationContext;
 import com.ezylang.evalex.data.EvaluationValue;
 import com.ezylang.evalex.functions.AbstractFunction;
 import com.ezylang.evalex.functions.FunctionParameter;
@@ -41,6 +42,7 @@ public class SumFunction extends AbstractFunction {
     BigDecimal sum = BigDecimal.ZERO;
     if (parameter.isArrayValue()) {
       for (EvaluationValue element : parameter.getArrayValue()) {
+        EvaluationContext.recordCollectionElement();
         sum =
             sum.add(
                 recursiveSum(element, expression), expression.getConfiguration().getMathContext());

@@ -112,3 +112,10 @@ ExpressionConfiguration configuration =
     
 Expression expression = new Expression("(a > 5 AND x < 10) OR (y < 0)");
 ```
+
+### Resource Budgets
+
+Operators with lazy operands should evaluate them through
+`expression.evaluateLazyParameter(operand.getExpressionNode())`. The first evaluation visits the
+operand subtree, repeated reads of the same node use the per-evaluation cache. See
+[Resource Budgets and Cancellation](../concepts/resource_budgets.html) for details.
