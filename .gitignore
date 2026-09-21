@@ -1,0 +1,67 @@
+# Eclipse
+.classpath
+.project
+.settings/
+
+# Intellij
+.idea/
+*.iml
+*.iws
+
+# Mac
+.DS_Store
+
+# Maven
+log/
+target/
+.flattened-pom.xml
+
+# Compiled class file
+*.class
+
+# Log file
+*.log
+
+# Package Files #
+*.jar
+*.war
+*.nar
+*.ear
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+/.sdkmanrc
+
+# --- 依赖与构建产物（不进交付快照）---
+node_modules/
+bower_components/
+.pnp.*
+dist/
+build/
+out/
+.next/
+.nuxt/
+.svelte-kit/
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+vendor/bundle/
+Pods/
+.gradle/
+.cargo/
+.env
+.env.*
+coverage/
+.coverage
+.nyc_output/
+.cache/
+.parcel-cache/
+.vite/
+.turbo/
+*.tsbuildinfo
