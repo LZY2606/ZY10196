@@ -140,3 +140,22 @@ ExpressionConfiguration configuration =
     
 Expression expression = new Expression("MAX_VALUE(1,2,3) + MIN_VALUE(7,8,9)", configuration);
 ```
+
+### Resource Budgets in Custom Functions
+
+A custom function can account for its own work and observe cancellation through the active
+evaluation context. This is useful for functions that iterate over large data or perform expensive
+operations.
+
+```java
+EvaluationContext context = EvaluationContext.current();
+for (Object element : largeCollection) {
+    context.charge(BudgetCategory.COLLECTION_ELEMENT, functionToken);
+    context.checkCancelled(functionToken);
+}
+```
+
+Outside an evaluation, `EvaluationContext.current()` returns a no-op context, so the calls are safe
+without an explicit null check. Lazy parameters can be evaluated with
+`expression.evaluateLazyNode(node)`, which counts the first evaluation and later cache hits
+separately. See [Resource Budgets and Cancellation](../concepts/resource_budgets.html) for details.

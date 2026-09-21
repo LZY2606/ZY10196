@@ -15,7 +15,10 @@
 */
 package com.ezylang.evalex.functions.basic;
 
+import com.ezylang.evalex.EvaluationException;
 import com.ezylang.evalex.Expression;
+import com.ezylang.evalex.budget.BudgetCategory;
+import com.ezylang.evalex.budget.EvaluationContext;
 import com.ezylang.evalex.data.EvaluationValue;
 import com.ezylang.evalex.functions.FunctionParameter;
 import com.ezylang.evalex.parser.Token;
@@ -33,29 +36,34 @@ import java.math.MathContext;
 public class AverageFunction extends AbstractMinMaxFunction {
   @Override
   public EvaluationValue evaluate(
-      Expression expression, Token functionToken, EvaluationValue... parameterValues) {
+      Expression expression, Token functionToken, EvaluationValue... parameterValues)
+      throws EvaluationException {
     MathContext mathContext = expression.getConfiguration().getMathContext();
-    BigDecimal average = average(mathContext, parameterValues);
+    BigDecimal average = average(mathContext, functionToken, parameterValues);
     return expression.convertValue(average);
   }
 
-  private BigDecimal average(MathContext mathContext, EvaluationValue... parameterValues) {
+  private BigDecimal average(
+      MathContext mathContext, Token functionToken, EvaluationValue... parameterValues)
+      throws EvaluationException {
     SumAndCount aux = new SumAndCount();
     for (EvaluationValue parameter : parameterValues) {
-      aux = aux.plus(recursiveSumAndCount(parameter));
+      aux = aux.plus(recursiveSumAndCount(parameter, functionToken));
     }
 
     return aux.sum.divide(aux.count, mathContext);
   }
 
-  private SumAndCount recursiveSumAndCount(EvaluationValue parameter) {
+  private SumAndCount recursiveSumAndCount(EvaluationValue parameter, Token functionToken)
+      throws EvaluationException {
     SumAndCount aux = new SumAndCount();
     if (parameter.isArrayValue()) {
       for (EvaluationValue element : parameter.getArrayValue()) {
-        aux = aux.plus(recursiveSumAndCount(element));
+        aux = aux.plus(recursiveSumAndCount(element, functionToken));
       }
       return aux;
     }
+    EvaluationContext.current().charge(BudgetCategory.COLLECTION_ELEMENT, functionToken);
     return new SumAndCount(parameter.getNumberValue(), BigDecimal.ONE);
   }
 

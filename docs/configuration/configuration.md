@@ -220,3 +220,25 @@ ExpressionConfiguration configuration=ExpressionConfiguration.builder()
         .zoneId(ZoneId.of("Europe/Berlin"))
         .build();
 ```
+
+### Resource Budget
+
+An optional `ResourceBudget` can limit the work of every evaluation started without an explicit
+evaluation context. When no budget is set (the default), evaluations behave as before and no
+budget is enforced.
+
+```java
+ExpressionConfiguration configuration = ExpressionConfiguration.builder()
+    .resourceBudget(
+        ResourceBudget.builder()
+            .totalWeightLimit(10_000L)
+            .categoryLimit(BudgetCategory.FUNCTION_CALL, 100L)
+            .build())
+    .build();
+```
+
+An explicit `EvaluationContext` passed to `Expression.evaluate(EvaluationContext)` always takes
+precedence. Nested expressions evaluated while a context is active reuse the active context and
+can not bypass the parent budget. See chapter
+[Resource Budgets and Cancellation](../concepts/resource_budgets.html) for the counted categories
+and the cancellation semantics.

@@ -112,3 +112,10 @@ ExpressionConfiguration configuration =
     
 Expression expression = new Expression("(a > 5 AND x < 10) OR (y < 0)");
 ```
+
+### Resource Budgets in Custom Operators
+
+Operators can account for additional work and observe cancellation through
+`EvaluationContext.current()`. Outside an evaluation this returns a no-op context, so custom
+operators can call `charge(...)` and `checkCancelled(...)` unconditionally. See
+[Resource Budgets and Cancellation](../concepts/resource_budgets.html) for details.

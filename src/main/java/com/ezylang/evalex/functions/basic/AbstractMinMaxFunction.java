@@ -15,19 +15,26 @@
 */
 package com.ezylang.evalex.functions.basic;
 
+import com.ezylang.evalex.EvaluationException;
+import com.ezylang.evalex.budget.BudgetCategory;
+import com.ezylang.evalex.budget.EvaluationContext;
 import com.ezylang.evalex.data.EvaluationValue;
 import com.ezylang.evalex.functions.AbstractFunction;
 import com.ezylang.evalex.functions.FunctionParameter;
+import com.ezylang.evalex.parser.Token;
 import java.math.BigDecimal;
 
 @FunctionParameter(name = "value", isVarArg = true)
 public abstract class AbstractMinMaxFunction extends AbstractFunction {
-  BigDecimal findMinOrMax(BigDecimal current, EvaluationValue parameter, boolean findMin) {
+  BigDecimal findMinOrMax(
+      BigDecimal current, EvaluationValue parameter, boolean findMin, Token functionToken)
+      throws EvaluationException {
     if (parameter.isArrayValue()) {
       for (EvaluationValue element : parameter.getArrayValue()) {
-        current = findMinOrMax(current, element, findMin);
+        current = findMinOrMax(current, element, findMin, functionToken);
       }
     } else {
+      EvaluationContext.current().charge(BudgetCategory.COLLECTION_ELEMENT, functionToken);
       current = compareAndAssign(current, parameter.getNumberValue(), findMin);
     }
     return current;

@@ -15,6 +15,7 @@
 */
 package com.ezylang.evalex.config;
 
+import com.ezylang.evalex.budget.ResourceBudget;
 import com.ezylang.evalex.data.DataAccessorIfc;
 import com.ezylang.evalex.data.EvaluationValue;
 import com.ezylang.evalex.data.MapBasedDataAccessor;
@@ -418,6 +419,16 @@ public class ExpressionConfiguration {
   @Builder.Default
   private final EvaluationValueConverterIfc evaluationValueConverter =
       new DefaultEvaluationValueConverter();
+
+  /**
+   * Optional resource budget applied to every evaluation started without an explicit evaluation
+   * context. When {@code null} (the default), no budget is enforced and evaluations behave as in
+   * versions without budget support. Explicit per evaluation contexts always take precedence, and
+   * nested expressions reuse the active context of their parent evaluation.
+   *
+   * @since 3.8.0
+   */
+  private final ResourceBudget resourceBudget;
 
   /**
    * Convenience method to create a default configuration.

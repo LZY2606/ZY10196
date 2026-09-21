@@ -68,3 +68,16 @@ ExpressionConfiguration configuration = ExpressionConfiguration.builder()
 
 Expression expression = new Expression("2.128 + a", configuration);
 ```
+
+### Resource Budgets in Data Accessors
+
+A data accessor reads variables outside AST evaluation and therefore has no token. It can account
+for reads against the active budget by charging the `DATA_ACCESS` category with a `null` token:
+
+```java
+EvaluationContext.current().charge(BudgetCategory.DATA_ACCESS, null);
+```
+
+Outside an evaluation the call is a no-op. Accessor implementations that throw runtime exceptions
+keep their behavior; the active budget context is cleaned up before the exception propagates. See
+[Resource Budgets and Cancellation](../concepts/resource_budgets.html) for details.

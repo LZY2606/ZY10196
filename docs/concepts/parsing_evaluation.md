@@ -164,3 +164,12 @@ enabling smoother handling of dynamic or incomplete input.
 
 Lenient Mode is **disabled** by default. To enable it, set the corresponding property in the
 [Configuration](../configuration/configuration.html).
+
+### Resource Budgets and Cancellation
+
+A single evaluation can be limited by a `ResourceBudget` and can be cancelled cooperatively. The
+budget counts AST node visits, function and operator calls, lazy parameter evaluations and cache
+hits, collection element traversals and data accessor reads. Short-circuited branches are not
+visited and do not consume budget.
+
+See [Resource Budgets and Cancellation](resource_budgets.html) for the full semantics.

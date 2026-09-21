@@ -15,7 +15,10 @@
 */
 package com.ezylang.evalex.functions.basic;
 
+import com.ezylang.evalex.EvaluationException;
 import com.ezylang.evalex.Expression;
+import com.ezylang.evalex.budget.BudgetCategory;
+import com.ezylang.evalex.budget.EvaluationContext;
 import com.ezylang.evalex.data.EvaluationValue;
 import com.ezylang.evalex.functions.AbstractFunction;
 import com.ezylang.evalex.functions.FunctionParameter;
@@ -27,25 +30,31 @@ import java.math.BigDecimal;
 public class SumFunction extends AbstractFunction {
   @Override
   public EvaluationValue evaluate(
-      Expression expression, Token functionToken, EvaluationValue... parameterValues) {
+      Expression expression, Token functionToken, EvaluationValue... parameterValues)
+      throws EvaluationException {
     BigDecimal sum = BigDecimal.ZERO;
     for (EvaluationValue parameter : parameterValues) {
       sum =
           sum.add(
-              recursiveSum(parameter, expression), expression.getConfiguration().getMathContext());
+              recursiveSum(parameter, expression, functionToken),
+              expression.getConfiguration().getMathContext());
     }
     return expression.convertValue(sum);
   }
 
-  private BigDecimal recursiveSum(EvaluationValue parameter, Expression expression) {
+  private BigDecimal recursiveSum(
+      EvaluationValue parameter, Expression expression, Token functionToken)
+      throws EvaluationException {
     BigDecimal sum = BigDecimal.ZERO;
     if (parameter.isArrayValue()) {
       for (EvaluationValue element : parameter.getArrayValue()) {
         sum =
             sum.add(
-                recursiveSum(element, expression), expression.getConfiguration().getMathContext());
+                recursiveSum(element, expression, functionToken),
+                expression.getConfiguration().getMathContext());
       }
     } else {
+      EvaluationContext.current().charge(BudgetCategory.COLLECTION_ELEMENT, functionToken);
       sum = sum.add(parameter.getNumberValue(), expression.getConfiguration().getMathContext());
     }
     return sum;

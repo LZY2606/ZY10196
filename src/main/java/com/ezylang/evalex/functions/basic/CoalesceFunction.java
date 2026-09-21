@@ -15,10 +15,10 @@
 */
 package com.ezylang.evalex.functions.basic;
 
-import static java.util.Arrays.stream;
-import static java.util.stream.Stream.of;
-
+import com.ezylang.evalex.EvaluationException;
 import com.ezylang.evalex.Expression;
+import com.ezylang.evalex.budget.BudgetCategory;
+import com.ezylang.evalex.budget.EvaluationContext;
 import com.ezylang.evalex.data.EvaluationValue;
 import com.ezylang.evalex.functions.AbstractFunction;
 import com.ezylang.evalex.functions.FunctionParameter;
@@ -33,12 +33,31 @@ public class CoalesceFunction extends AbstractFunction {
 
   @Override
   public EvaluationValue evaluate(
-      Expression expression, Token functionToken, EvaluationValue... parameterValues) {
+      Expression expression, Token functionToken, EvaluationValue... parameterValues)
+      throws EvaluationException {
 
-    return stream(parameterValues)
-        .flatMap(v -> v.isArrayValue() ? v.getArrayValue().stream() : of(v))
-        .filter(v -> !v.isNullValue())
-        .findFirst()
-        .orElse(EvaluationValue.NULL_VALUE);
+    for (EvaluationValue parameter : parameterValues) {
+      EvaluationValue result = firstNonNull(parameter, functionToken);
+      if (!result.isNullValue()) {
+        return result;
+      }
+    }
+    return EvaluationValue.NULL_VALUE;
+  }
+
+  private EvaluationValue firstNonNull(EvaluationValue value, Token functionToken)
+      throws EvaluationException {
+    if (!value.isArrayValue()) {
+      return value.isNullValue() ? EvaluationValue.NULL_VALUE : value;
+    }
+    for (EvaluationValue element : value.getArrayValue()) {
+      if (!element.isArrayValue()) {
+        EvaluationContext.current().charge(BudgetCategory.COLLECTION_ELEMENT, functionToken);
+      }
+      if (!element.isNullValue()) {
+        return element;
+      }
+    }
+    return EvaluationValue.NULL_VALUE;
   }
 }
